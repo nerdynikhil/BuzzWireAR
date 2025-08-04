@@ -1,6 +1,8 @@
 import Foundation
 import AVFoundation
+import Combine
 
+@MainActor
 class SoundManager: ObservableObject {
     private var audioPlayer: AVAudioPlayer?
     private var audioEngine = AVAudioEngine()
