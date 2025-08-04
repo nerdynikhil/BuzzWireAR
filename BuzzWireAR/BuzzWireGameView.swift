@@ -11,7 +11,7 @@ class BuzzWireGameState {
     var buzzCount = 0
     var isGameWon = false
     var isGameLost = false
-    var ringPosition: SIMD3<Float> = [-0.1, 0.02, 0]
+    var ringPosition: SIMD3<Float> = [-0.15, 0.01, 0]
     var ringEntity: Entity?
     var wireEntities: [Entity] = []
     private var gameTimer: Timer?
@@ -24,7 +24,7 @@ class BuzzWireGameState {
         buzzCount = 0
         isGameWon = false
         isGameLost = false
-        ringPosition = [-0.1, 0.02, 0]
+        ringPosition = [-0.15, 0.01, 0]
         
         gameTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             self.gameTime += 0.1
@@ -66,7 +66,7 @@ class BuzzWireGameState {
         ringPosition = position
         ringEntity?.position = position
         
-        if position.x >= 0.09 && gameStarted {
+        if position.x >= 0.14 && gameStarted {
             winGame()
         }
     }
@@ -248,7 +248,7 @@ struct BuzzWireGameView: View {
         newPosition.x += deltaX
         newPosition.y += deltaY
         
-        newPosition.x = max(-0.12, min(0.12, newPosition.x))
+        newPosition.x = max(-0.16, min(0.16, newPosition.x))
         newPosition.y = max(0.01, min(0.05, newPosition.y))
         
         gameState.moveRing(to: newPosition)
@@ -298,6 +298,15 @@ struct ARViewContainer: UIViewRepresentable {
         arView.scene.addAnchor(anchor)
         print("✅ Added anchor to scene")
         
+        // Add collision detection back
+        arView.scene.subscribe(to: CollisionEvents.Began.self) { event in
+            DispatchQueue.main.async {
+                gameState.buzz()
+                soundManager.playBuzzSound()
+                print("🔊 BUZZ! Collision detected")
+            }
+        }.store(in: &gameState.collisionSubscriptions)
+        
         // Notify immediately
         DispatchQueue.main.async {
             onPlaneDetected()
@@ -314,21 +323,25 @@ struct ARViewContainer: UIViewRepresentable {
 func createSimpleWire() -> Entity {
     let wireContainer = Entity()
     
-    // Create simple straight wire with 3 segments
+    // Create twisted wire path that looks more interesting
     let wirePoints: [SIMD3<Float>] = [
-        [-0.1, 0.02, 0],
-        [0, 0.03, 0],
-        [0.1, 0.02, 0]
+        [-0.15, 0.01, 0],
+        [-0.08, 0.04, 0.02],
+        [0, 0.02, -0.01],
+        [0.08, 0.05, 0.01],
+        [0.15, 0.01, 0]
     ]
     
     for i in 0..<wirePoints.count {
         let wireSegment = Entity()
         wireSegment.components.set(ModelComponent(
-            mesh: MeshResource.generateBox(size: [0.01, 0.01, 0.08]),
-            materials: [SimpleMaterial(color: .orange, isMetallic: false)]
+            mesh: MeshResource.generateBox(size: [0.003, 0.003, 0.04]),
+            materials: [SimpleMaterial(color: .init(red: 0.8, green: 0.6, blue: 0.2, alpha: 1), roughness: 0.3, isMetallic: true)]
         ))
         wireSegment.position = wirePoints[i]
-        // Remove collision for now to prevent crashes
+        
+        // Add collision back now that audio is safe
+        wireSegment.components.set(CollisionComponent(shapes: [.generateBox(size: [0.01, 0.01, 0.04])]))
         
         wireContainer.addChild(wireSegment)
     }
@@ -339,10 +352,12 @@ func createSimpleWire() -> Entity {
 func createSimpleRing() -> Entity {
     let ring = Entity()
     ring.components.set(ModelComponent(
-        mesh: MeshResource.generateBox(size: [0.02, 0.02, 0.005]),
-        materials: [SimpleMaterial(color: .blue, isMetallic: false)]
+        mesh: MeshResource.generateBox(size: [0.018, 0.018, 0.003]),  
+        materials: [SimpleMaterial(color: .init(red: 0.1, green: 0.5, blue: 0.9, alpha: 1), roughness: 0.2, isMetallic: true)]
     ))
-    // Remove collision for now to prevent crashes
+    
+    // Add collision back
+    ring.components.set(CollisionComponent(shapes: [.generateBox(size: [0.018, 0.018, 0.003])]))
     
     return ring
 }
