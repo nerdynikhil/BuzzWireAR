@@ -2,6 +2,7 @@ import SwiftUI
 import RealityKit
 import ARKit
 import Combine
+import UIKit
 
 @Observable
 class BuzzWireGameState {
@@ -15,6 +16,7 @@ class BuzzWireGameState {
     var wireEntities: [Entity] = []
     private var gameTimer: Timer?
     private var collisionSubscription: AnyCancellable?
+    var collisionSubscriptions: Set<AnyCancellable> = []
     
     func startGame() {
         gameStarted = true
@@ -27,8 +29,6 @@ class BuzzWireGameState {
         gameTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             self.gameTime += 0.1
         }
-        
-        setupCollisionDetection()
     }
     
     func buzz() {
@@ -51,6 +51,7 @@ class BuzzWireGameState {
         gameTimer?.invalidate()
         gameTimer = nil
         collisionSubscription?.cancel()
+        collisionSubscriptions.removeAll()
         
         if won {
             triggerSuccessHapticFeedback()
@@ -70,17 +71,6 @@ class BuzzWireGameState {
         }
     }
     
-    private func setupCollisionDetection() {
-        guard let ringEntity = ringEntity else { return }
-        
-        collisionSubscription = ringEntity.scene?.subscribe(to: CollisionEvents.Began.self) { event in
-            if event.entityA == ringEntity || event.entityB == ringEntity {
-                DispatchQueue.main.async {
-                    self.buzz()
-                }
-            }
-        }
-    }
     
     private func triggerHapticFeedback() {
         let impactGenerator = UIImpactFeedbackGenerator(style: .heavy)
@@ -110,13 +100,9 @@ struct BuzzWireGameView: View {
     
     var body: some View {
         ZStack {
-            RealityView { content in
-                setupBuzzWireGame(content: content, gameState: gameState, soundManager: soundManager, onPlaneDetected: {
-                    planeDetected = true
-                })
-            } update: { content in
-                updateGame(content: content, gameState: gameState)
-            }
+            ARViewContainer(gameState: gameState, soundManager: soundManager, onPlaneDetected: {
+                planeDetected = true
+            })
             .edgesIgnoringSafeArea(.all)
             .gesture(
                 DragGesture()
@@ -200,7 +186,6 @@ struct BuzzWireGameView: View {
                             .foregroundColor(.white)
                         Button("Play Again") {
                             gameState.startGame()
-                            soundManager.playSuccessSound()
                         }
                         .padding()
                         .background(Color.green)
@@ -247,6 +232,11 @@ struct BuzzWireGameView: View {
                 }
             }
         }
+        .onChange(of: gameState.isGameWon) { _, isWon in
+            if isWon {
+                soundManager.playSuccessSound()
+            }
+        }
     }
     
     private func handleDrag(value: DragGesture.Value) {
@@ -265,37 +255,52 @@ struct BuzzWireGameView: View {
     }
 }
 
-func setupBuzzWireGame(content: inout RealityViewContent, gameState: BuzzWireGameState, soundManager: SoundManager, onPlaneDetected: @escaping () -> Void) {
-    let anchor = AnchorEntity(.plane(.horizontal, classification: .any, minimumBounds: SIMD2<Float>(0.3, 0.3)))
+struct ARViewContainer: UIViewRepresentable {
+    let gameState: BuzzWireGameState
+    let soundManager: SoundManager
+    let onPlaneDetected: () -> Void
     
-    onPlaneDetected()
-    
-    let wireContainer = createWirePath()
-    gameState.wireEntities = wireContainer.children.compactMap { $0 as? Entity }
-    anchor.addChild(wireContainer)
-    
-    let ringEntity = createRing()
-    ringEntity.position = gameState.ringPosition
-    gameState.ringEntity = ringEntity
-    anchor.addChild(ringEntity)
-    
-    content.add(anchor)
-    
-    setupGameSounds(gameState: gameState, soundManager: soundManager)
-}
-
-func setupGameSounds(gameState: BuzzWireGameState, soundManager: SoundManager) {
-    gameState.ringEntity?.scene?.subscribe(to: CollisionEvents.Began.self) { event in
-        if event.entityA == gameState.ringEntity || event.entityB == gameState.ringEntity {
-            DispatchQueue.main.async {
-                soundManager.playBuzzSound()
-            }
+    func makeUIView(context: Context) -> ARView {
+        let arView = ARView(frame: .zero)
+        
+        let config = ARWorldTrackingConfiguration()
+        config.planeDetection = [.horizontal]
+        config.environmentTexturing = .automatic
+        
+        arView.session.run(config)
+        
+        let anchor = AnchorEntity(.plane(.horizontal, classification: .any, minimumBounds: SIMD2<Float>(0.3, 0.3)))
+        
+        DispatchQueue.main.async {
+            onPlaneDetected()
         }
+        
+        let wireContainer = createWirePath()
+        gameState.wireEntities = wireContainer.children.compactMap { $0 as? Entity }
+        anchor.addChild(wireContainer)
+        
+        let ringEntity = createRing()
+        ringEntity.position = gameState.ringPosition
+        gameState.ringEntity = ringEntity
+        anchor.addChild(ringEntity)
+        
+        arView.scene.addAnchor(anchor)
+        
+        arView.scene.subscribe(to: CollisionEvents.Began.self) { event in
+            if event.entityA == gameState.ringEntity || event.entityB == gameState.ringEntity {
+                DispatchQueue.main.async {
+                    gameState.buzz()
+                    soundManager.playBuzzSound()
+                }
+            }
+        }.store(in: &gameState.collisionSubscriptions)
+        
+        return arView
     }
-}
-
-func updateGame(content: inout RealityViewContent, gameState: BuzzWireGameState) {
-    gameState.ringEntity?.position = gameState.ringPosition
+    
+    func updateUIView(_ uiView: ARView, context: Context) {
+        gameState.ringEntity?.position = gameState.ringPosition
+    }
 }
 
 func createWirePath() -> Entity {
