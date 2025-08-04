@@ -263,41 +263,41 @@ struct ARViewContainer: UIViewRepresentable {
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
         
+        // Setup AR configuration
         let config = ARWorldTrackingConfiguration()
         config.planeDetection = [.horizontal]
         arView.session.run(config)
         
-        // Create simple anchor that appears immediately
+        // Create anchor that places content on detected horizontal plane
         let anchor = AnchorEntity(.plane(.horizontal, classification: .any, minimumBounds: SIMD2<Float>(0.2, 0.2)))
         
-        // Add a simple test cube first to verify AR is working
+        // Add red test cube to verify AR works
         let testCube = Entity()
-        let cubeMesh = MeshResource.generateBox(size: 0.05)
-        let cubeMaterial = SimpleMaterial(color: .red, isMetallic: false)
-        testCube.components.set(ModelComponent(mesh: cubeMesh, materials: [cubeMaterial]))
+        testCube.components.set(ModelComponent(
+            mesh: MeshResource.generateBox(size: 0.05),
+            materials: [SimpleMaterial(color: .red, isMetallic: false)]
+        ))
         testCube.position = [0, 0.025, 0]
         anchor.addChild(testCube)
         
-        // Add simple wire path
+        print("✅ Added test cube")
+        
+        // Add wire and ring
         let wirePath = createSimpleWire()
         anchor.addChild(wirePath)
+        print("✅ Added wire path")
         
-        // Add simple ring
         let ring = createSimpleRing()
-        ring.position = [-0.1, 0.01, 0]
+        ring.position = gameState.ringPosition
         gameState.ringEntity = ring
         anchor.addChild(ring)
+        print("✅ Added ring")
         
+        // Add anchor to scene
         arView.scene.addAnchor(anchor)
+        print("✅ Added anchor to scene")
         
-        // Simple collision detection
-        arView.scene.subscribe(to: CollisionEvents.Began.self) { event in
-            DispatchQueue.main.async {
-                gameState.buzz()
-                soundManager.playBuzzSound()
-            }
-        }.store(in: &gameState.collisionSubscriptions)
-        
+        // Notify that plane was detected
         DispatchQueue.main.async {
             onPlaneDetected()
         }
@@ -322,11 +322,12 @@ func createSimpleWire() -> Entity {
     
     for i in 0..<wirePoints.count {
         let wireSegment = Entity()
-        let mesh = MeshResource.generateBox(size: [0.002, 0.002, 0.08])
-        let material = SimpleMaterial(color: .orange, isMetallic: false)
-        wireSegment.components.set(ModelComponent(mesh: mesh, materials: [material]))
+        wireSegment.components.set(ModelComponent(
+            mesh: MeshResource.generateBox(size: [0.01, 0.01, 0.08]),
+            materials: [SimpleMaterial(color: .orange, isMetallic: false)]
+        ))
         wireSegment.position = wirePoints[i]
-        wireSegment.components.set(CollisionComponent(shapes: [.generateBox(size: [0.01, 0.01, 0.08])]))
+        // Remove collision for now to prevent crashes
         
         wireContainer.addChild(wireSegment)
     }
@@ -336,10 +337,11 @@ func createSimpleWire() -> Entity {
 
 func createSimpleRing() -> Entity {
     let ring = Entity()
-    let mesh = MeshResource.generateBox(size: [0.015, 0.015, 0.003])
-    let material = SimpleMaterial(color: .blue, isMetallic: false)
-    ring.components.set(ModelComponent(mesh: mesh, materials: [material]))
-    ring.components.set(CollisionComponent(shapes: [.generateBox(size: [0.015, 0.015, 0.003])]))
+    ring.components.set(ModelComponent(
+        mesh: MeshResource.generateBox(size: [0.02, 0.02, 0.005]),
+        materials: [SimpleMaterial(color: .blue, isMetallic: false)]
+    ))
+    // Remove collision for now to prevent crashes
     
     return ring
 }
