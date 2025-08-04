@@ -241,8 +241,8 @@ struct BuzzWireGameView: View {
     
     private func handleDrag(value: DragGesture.Value) {
         let sensitivity: Float = 0.0003
-        let deltaX = Float(value.translation.x) * sensitivity
-        let deltaY = -Float(value.translation.y) * sensitivity
+        let deltaX = Float(value.translation.width) * sensitivity
+        let deltaY = -Float(value.translation.height) * sensitivity
         
         var newPosition = gameState.ringPosition
         newPosition.x += deltaX
@@ -276,7 +276,7 @@ struct ARViewContainer: UIViewRepresentable {
         }
         
         let wireContainer = createWirePath()
-        gameState.wireEntities = wireContainer.children.compactMap { $0 as? Entity }
+        gameState.wireEntities = Array(wireContainer.children)
         anchor.addChild(wireContainer)
         
         let ringEntity = createRing()
@@ -343,7 +343,7 @@ func createWirePath() -> Entity {
         wireSegment.transform.matrix = rotationMatrix
         wireSegment.position = center
         
-        wireSegment.components.set(CollisionComponent(shapes: [.generateCylinder(height: distance, radius: 0.006)]))
+        wireSegment.components.set(CollisionComponent(shapes: [ShapeResource.generateCylinder(height: distance, radius: 0.006)]))
         
         wireContainer.addChild(wireSegment)
     }
@@ -364,14 +364,29 @@ func createWirePath() -> Entity {
 }
 
 func createRing() -> Entity {
-    let ring = Entity()
-    let mesh = MeshResource.generateTorus(outerRadius: 0.01, innerRadius: 0.007)
+    let ringContainer = Entity()
     let material = SimpleMaterial(color: .init(red: 0.1, green: 0.5, blue: 0.9, alpha: 1), roughness: 0.2, isMetallic: true)
-    ring.components.set(ModelComponent(mesh: mesh, materials: [material]))
     
-    ring.components.set(CollisionComponent(shapes: [.generateTorus(outerRadius: 0.01, innerRadius: 0.007)]))
+    let segments = 12
+    let radius: Float = 0.01
+    let tubeRadius: Float = 0.002
     
-    return ring
+    for i in 0..<segments {
+        let angle = Float(i) * 2.0 * Float.pi / Float(segments)
+        let x = radius * cos(angle)
+        let z = radius * sin(angle)
+        
+        let segment = Entity()
+        let mesh = MeshResource.generateSphere(radius: tubeRadius)
+        segment.components.set(ModelComponent(mesh: mesh, materials: [material]))
+        segment.position = [x, 0, z]
+        
+        ringContainer.addChild(segment)
+    }
+    
+    ringContainer.components.set(CollisionComponent(shapes: [ShapeResource.generateSphere(radius: 0.012)]))
+    
+    return ringContainer
 }
 
 #Preview {
