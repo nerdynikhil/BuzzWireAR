@@ -315,76 +315,78 @@ struct ARViewContainer: UIViewRepresentable {
 func createSimpleWire() -> Entity {
     let wireContainer = Entity()
     
-    // Create ONE continuous curved wire using many small connected segments
-    let wireRadius: Float = 0.003
-    let segmentCount = 50 // Many small segments for smooth continuous curve
+    // Create simple curved wire path like the DIY buzz wire
+    // Use fewer, larger segments to simulate bent wire sections
+    let wireSegments: [(start: SIMD3<Float>, end: SIMD3<Float>)] = [
+        // Create wire path like the DIY image - with clear bent sections
+        ([-0.2, 0, 0], [-0.15, 0.02, 0]),        // Start rise
+        ([-0.15, 0.02, 0], [-0.1, 0.05, 0.01]),  // Up curve
+        ([-0.1, 0.05, 0.01], [-0.05, 0.06, -0.01]), // High curve left
+        ([-0.05, 0.06, -0.01], [0, 0.04, 0.02]),    // Down curve right
+        ([0, 0.04, 0.02], [0.05, 0.02, 0]),        // Down more
+        ([0.05, 0.02, 0], [0.1, 0.05, -0.02]),     // Up again with twist
+        ([0.1, 0.05, -0.02], [0.15, 0.03, 0.01]),  // Down curve
+        ([0.15, 0.03, 0.01], [0.2, 0, 0])          // End
+    ]
     
-    for i in 0..<segmentCount {
-        let t = Float(i) / Float(segmentCount - 1) // 0.0 to 1.0
-        let nextT = Float(i + 1) / Float(segmentCount - 1)
+    // Create each wire segment as a thick cylinder
+    for (start, end) in wireSegments {
+        let distance = length(end - start)
+        let center = (start + end) / 2
         
-        let currentPoint = getWirePositionAt(t: t)
-        let nextPoint = getWirePositionAt(t: nextT < 1.0 ? nextT : t)
+        let wireSegment = Entity()
+        wireSegment.components.set(ModelComponent(
+            mesh: MeshResource.generateCylinder(height: distance, radius: 0.004),
+            materials: [SimpleMaterial(color: .init(red: 0.8, green: 0.6, blue: 0.2, alpha: 1), roughness: 0.3, isMetallic: true)]
+        ))
         
-        if i < segmentCount - 1 {
-            let distance = length(nextPoint - currentPoint)
-            let center = (currentPoint + nextPoint) / 2
-            
-            let wireSegment = Entity()
-            wireSegment.components.set(ModelComponent(
-                mesh: MeshResource.generateCylinder(height: distance, radius: wireRadius),
-                materials: [SimpleMaterial(color: .init(red: 0.8, green: 0.6, blue: 0.2, alpha: 1), roughness: 0.3, isMetallic: true)]
-            ))
-            
-            // Orient the cylinder along the wire segment
-            let direction = normalize(nextPoint - currentPoint)
-            let up = SIMD3<Float>(0, 1, 0)
-            let right = normalize(cross(up, direction))
-            let newUp = cross(direction, right)
-            
-            let rotationMatrix = float4x4(
-                SIMD4<Float>(right.x, right.y, right.z, 0),
-                SIMD4<Float>(newUp.x, newUp.y, newUp.z, 0),
-                SIMD4<Float>(direction.x, direction.y, direction.z, 0),
-                SIMD4<Float>(0, 0, 0, 1)
-            )
-            
-            wireSegment.transform.matrix = rotationMatrix
-            wireSegment.position = center
-            wireSegment.components.set(CollisionComponent(shapes: [.generateCapsule(height: distance, radius: wireRadius * 2)]))
-            
-            wireContainer.addChild(wireSegment)
-        }
+        // Orient the cylinder along the wire segment
+        let direction = normalize(end - start)
+        let up = SIMD3<Float>(0, 1, 0)
+        let right = normalize(cross(up, direction))
+        let newUp = cross(direction, right)
+        
+        let rotationMatrix = float4x4(
+            SIMD4<Float>(right.x, right.y, right.z, 0),
+            SIMD4<Float>(newUp.x, newUp.y, newUp.z, 0),
+            SIMD4<Float>(direction.x, direction.y, direction.z, 0),
+            SIMD4<Float>(0, 0, 0, 1)
+        )
+        
+        wireSegment.transform.matrix = rotationMatrix
+        wireSegment.position = center
+        wireSegment.components.set(CollisionComponent(shapes: [.generateCapsule(height: distance, radius: 0.008)]))
+        
+        wireContainer.addChild(wireSegment)
     }
     
-    // Add support posts at start and end
+    // Add wooden base platform like in DIY image
+    let basePlatform = Entity()
+    basePlatform.components.set(ModelComponent(
+        mesh: MeshResource.generateBox(size: [0.45, 0.02, 0.15]),
+        materials: [SimpleMaterial(color: .init(red: 0.8, green: 0.6, blue: 0.4, alpha: 1), roughness: 0.8, isMetallic: false)]
+    ))
+    basePlatform.position = [0, -0.08, 0]
+    wireContainer.addChild(basePlatform)
+    
+    // Add support posts at start and end - taller like in DIY
     let startPost = Entity()
     startPost.components.set(ModelComponent(
-        mesh: MeshResource.generateCylinder(height: 0.12, radius: 0.008),
-        materials: [SimpleMaterial(color: .init(red: 0.3, green: 0.3, blue: 0.3, alpha: 1), isMetallic: false)]
+        mesh: MeshResource.generateCylinder(height: 0.15, radius: 0.008),
+        materials: [SimpleMaterial(color: .init(red: 0.6, green: 0.4, blue: 0.2, alpha: 1), isMetallic: false)]
     ))
-    startPost.position = [getWirePositionAt(t: 0).x, -0.06, 0]
+    startPost.position = [-0.2, -0.01, 0]
     wireContainer.addChild(startPost)
     
     let endPost = Entity()
     endPost.components.set(ModelComponent(
-        mesh: MeshResource.generateCylinder(height: 0.12, radius: 0.008),
-        materials: [SimpleMaterial(color: .init(red: 0.3, green: 0.3, blue: 0.3, alpha: 1), isMetallic: false)]
+        mesh: MeshResource.generateCylinder(height: 0.15, radius: 0.008),
+        materials: [SimpleMaterial(color: .init(red: 0.6, green: 0.4, blue: 0.2, alpha: 1), isMetallic: false)]
     ))
-    endPost.position = [getWirePositionAt(t: 1).x, -0.06, 0]
+    endPost.position = [0.2, -0.01, 0]
     wireContainer.addChild(endPost)
     
     return wireContainer
-}
-
-// Function to get smooth wire position along the curve
-func getWirePositionAt(t: Float) -> SIMD3<Float> {
-    // Create smooth sine wave with twists for realistic buzz wire path
-    let x = -0.2 + (t * 0.4) // Goes from -0.2 to +0.2
-    let y = sin(t * Float.pi * 2) * 0.03 + sin(t * Float.pi * 4) * 0.015 // Smooth up/down curves
-    let z = cos(t * Float.pi * 3) * 0.02 // Smooth forward/back twists
-    
-    return SIMD3<Float>(x, y, z)
 }
 
 func createSimpleRing() -> Entity {
