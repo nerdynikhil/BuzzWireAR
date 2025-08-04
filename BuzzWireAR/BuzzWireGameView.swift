@@ -57,6 +57,10 @@ class BuzzWireGameState {
         }
     }
     
+    func setGameCompleteCallback(_ callback: @escaping (Bool) -> Void) {
+        // This will be called when game ends to trigger sound
+    }
+    
     func moveRing(to position: SIMD3<Float>) {
         ringPosition = position
         ringEntity?.position = position
@@ -87,16 +91,29 @@ class BuzzWireGameState {
         let notificationGenerator = UINotificationFeedbackGenerator()
         notificationGenerator.notificationOccurred(.success)
     }
+    
+    func playBuzzSound() {
+        // Will be called from the view
+    }
+    
+    func playSuccessSound() {
+        // Will be called from the view
+    }
 }
 
 struct BuzzWireGameView: View {
     @State private var gameState = BuzzWireGameState()
     @State private var dragOffset: CGSize = .zero
+    @StateObject private var soundManager = SoundManager()
+    @State private var showInstructions = false
+    @State private var planeDetected = false
     
     var body: some View {
         ZStack {
             RealityView { content in
-                setupBuzzWireGame(content: content, gameState: gameState)
+                setupBuzzWireGame(content: content, gameState: gameState, soundManager: soundManager, onPlaneDetected: {
+                    planeDetected = true
+                })
             } update: { content in
                 updateGame(content: content, gameState: gameState)
             }
@@ -112,6 +129,13 @@ struct BuzzWireGameView: View {
                         dragOffset = .zero
                     }
             )
+            
+            if !planeDetected {
+                ARCoachingView()
+            }
+            
+            ARInstructionsOverlay(showInstructions: showInstructions)
+            ARPlaneVisualization(planeDetected: planeDetected)
             
             VStack {
                 HStack {
@@ -147,6 +171,10 @@ struct BuzzWireGameView: View {
                         
                         Button("Start Game") {
                             gameState.startGame()
+                            showInstructions = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                                showInstructions = false
+                            }
                         }
                         .padding()
                         .background(Color.blue)
@@ -172,6 +200,7 @@ struct BuzzWireGameView: View {
                             .foregroundColor(.white)
                         Button("Play Again") {
                             gameState.startGame()
+                            soundManager.playSuccessSound()
                         }
                         .padding()
                         .background(Color.green)
@@ -236,8 +265,10 @@ struct BuzzWireGameView: View {
     }
 }
 
-func setupBuzzWireGame(content: RealityViewContent, gameState: BuzzWireGameState) {
+func setupBuzzWireGame(content: RealityViewContent, gameState: BuzzWireGameState, soundManager: SoundManager, onPlaneDetected: @escaping () -> Void) {
     let anchor = AnchorEntity(.plane(.horizontal, classification: .any, minimumBounds: SIMD2<Float>(0.3, 0.3)))
+    
+    onPlaneDetected()
     
     let wireContainer = createWirePath()
     gameState.wireEntities = wireContainer.children.compactMap { $0 as? Entity }
@@ -249,6 +280,18 @@ func setupBuzzWireGame(content: RealityViewContent, gameState: BuzzWireGameState
     anchor.addChild(ringEntity)
     
     content.add(anchor)
+    
+    setupGameSounds(gameState: gameState, soundManager: soundManager)
+}
+
+func setupGameSounds(gameState: BuzzWireGameState, soundManager: SoundManager) {
+    gameState.ringEntity?.scene?.subscribe(to: CollisionEvents.Began.self) { event in
+        if event.entityA == gameState.ringEntity || event.entityB == gameState.ringEntity {
+            DispatchQueue.main.async {
+                soundManager.playBuzzSound()
+            }
+        }
+    }
 }
 
 func updateGame(content: RealityViewContent, gameState: BuzzWireGameState) {
