@@ -268,8 +268,9 @@ struct ARViewContainer: UIViewRepresentable {
         config.planeDetection = [.horizontal]
         arView.session.run(config)
         
-        // Create anchor that places content on detected horizontal plane
-        let anchor = AnchorEntity(.plane(.horizontal, classification: .any, minimumBounds: SIMD2<Float>(0.2, 0.2)))
+        // Create anchor that appears immediately in front of camera (no plane detection needed)
+        let anchor = AnchorEntity(.camera)
+        anchor.position = [0, -0.1, -0.5] // 50cm in front, 10cm below camera
         
         // Add red test cube to verify AR works
         let testCube = Entity()
@@ -277,7 +278,7 @@ struct ARViewContainer: UIViewRepresentable {
             mesh: MeshResource.generateBox(size: 0.05),
             materials: [SimpleMaterial(color: .red, isMetallic: false)]
         ))
-        testCube.position = [0, 0.025, 0]
+        testCube.position = [0, 0, 0]
         anchor.addChild(testCube)
         
         print("✅ Added test cube")
@@ -297,7 +298,7 @@ struct ARViewContainer: UIViewRepresentable {
         arView.scene.addAnchor(anchor)
         print("✅ Added anchor to scene")
         
-        // Notify that plane was detected
+        // Notify immediately
         DispatchQueue.main.async {
             onPlaneDetected()
         }
