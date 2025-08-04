@@ -313,80 +313,37 @@ struct ARViewContainer: UIViewRepresentable {
 }
 
 func createSimpleWire() -> Entity {
-    let wireContainer = Entity()
-    
-    // Create simple curved wire path like the DIY buzz wire
-    // Use fewer, larger segments to simulate bent wire sections
-    let wireSegments: [(start: SIMD3<Float>, end: SIMD3<Float>)] = [
-        // Create wire path like the DIY image - with clear bent sections
-        ([-0.2, 0, 0], [-0.15, 0.02, 0]),        // Start rise
-        ([-0.15, 0.02, 0], [-0.1, 0.05, 0.01]),  // Up curve
-        ([-0.1, 0.05, 0.01], [-0.05, 0.06, -0.01]), // High curve left
-        ([-0.05, 0.06, -0.01], [0, 0.04, 0.02]),    // Down curve right
-        ([0, 0.04, 0.02], [0.05, 0.02, 0]),        // Down more
-        ([0.05, 0.02, 0], [0.1, 0.05, -0.02]),     // Up again with twist
-        ([0.1, 0.05, -0.02], [0.15, 0.03, 0.01]),  // Down curve
-        ([0.15, 0.03, 0.01], [0.2, 0, 0])          // End
-    ]
-    
-    // Create each wire segment as a thick cylinder
-    for (start, end) in wireSegments {
-        let distance = length(end - start)
-        let center = (start + end) / 2
+    // Load the Collada (.dae) 3D model instead of generating cylinders
+    do {
+        let wireModel = try Entity.load(named: "3D Model - Buzz+Wire/model.dae")
+        print("✅ Successfully loaded buzz wire 3D model")
         
-        let wireSegment = Entity()
-        wireSegment.components.set(ModelComponent(
-            mesh: MeshResource.generateCylinder(height: distance, radius: 0.004),
-            materials: [SimpleMaterial(color: .init(red: 0.8, green: 0.6, blue: 0.2, alpha: 1), roughness: 0.3, isMetallic: true)]
-        ))
+        // Scale the model appropriately for AR viewing
+        wireModel.scale = [0.001, 0.001, 0.001] // Scale down from SketchUp units
+        wireModel.position = [0, 0, 0]
         
-        // Orient the cylinder along the wire segment
-        let direction = normalize(end - start)
-        let up = SIMD3<Float>(0, 1, 0)
-        let right = normalize(cross(up, direction))
-        let newUp = cross(direction, right)
+        // Add collision detection to the entire model
+        // We'll add a simplified collision shape since the 3D model is complex
+        let simplifiedCollision = Entity()
+        simplifiedCollision.components.set(CollisionComponent(shapes: [
+            .generateBox(size: [0.4, 0.1, 0.1]) // Simple box collision for the wire area
+        ]))
+        wireModel.addChild(simplifiedCollision)
         
-        let rotationMatrix = float4x4(
-            SIMD4<Float>(right.x, right.y, right.z, 0),
-            SIMD4<Float>(newUp.x, newUp.y, newUp.z, 0),
-            SIMD4<Float>(direction.x, direction.y, direction.z, 0),
-            SIMD4<Float>(0, 0, 0, 1)
-        )
+        return wireModel
+    } catch {
+        print("❌ Failed to load 3D model: \(error)")
+        print("📝 Creating fallback simple wire...")
         
-        wireSegment.transform.matrix = rotationMatrix
-        wireSegment.position = center
-        wireSegment.components.set(CollisionComponent(shapes: [.generateCapsule(height: distance, radius: 0.008)]))
+        // Fallback: create a simple wire if model loading fails
+        let fallbackWire = Entity()
+        let simpleMesh = MeshResource.generateBox(size: [0.3, 0.02, 0.02])
+        let simpleMaterial = SimpleMaterial(color: .orange, isMetallic: false)
+        fallbackWire.components.set(ModelComponent(mesh: simpleMesh, materials: [simpleMaterial]))
+        fallbackWire.components.set(CollisionComponent(shapes: [.generateBox(size: [0.3, 0.02, 0.02])]))
         
-        wireContainer.addChild(wireSegment)
+        return fallbackWire
     }
-    
-    // Add wooden base platform like in DIY image
-    let basePlatform = Entity()
-    basePlatform.components.set(ModelComponent(
-        mesh: MeshResource.generateBox(size: [0.45, 0.02, 0.15]),
-        materials: [SimpleMaterial(color: .init(red: 0.8, green: 0.6, blue: 0.4, alpha: 1), roughness: 0.8, isMetallic: false)]
-    ))
-    basePlatform.position = [0, -0.08, 0]
-    wireContainer.addChild(basePlatform)
-    
-    // Add support posts at start and end - taller like in DIY
-    let startPost = Entity()
-    startPost.components.set(ModelComponent(
-        mesh: MeshResource.generateCylinder(height: 0.15, radius: 0.008),
-        materials: [SimpleMaterial(color: .init(red: 0.6, green: 0.4, blue: 0.2, alpha: 1), isMetallic: false)]
-    ))
-    startPost.position = [-0.2, -0.01, 0]
-    wireContainer.addChild(startPost)
-    
-    let endPost = Entity()
-    endPost.components.set(ModelComponent(
-        mesh: MeshResource.generateCylinder(height: 0.15, radius: 0.008),
-        materials: [SimpleMaterial(color: .init(red: 0.6, green: 0.4, blue: 0.2, alpha: 1), isMetallic: false)]
-    ))
-    endPost.position = [0.2, -0.01, 0]
-    wireContainer.addChild(endPost)
-    
-    return wireContainer
 }
 
 func createSimpleRing() -> Entity {
