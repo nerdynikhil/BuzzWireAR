@@ -240,9 +240,9 @@ struct BuzzWireGameView: View {
     }
     
     private func handleDrag(value: DragGesture.Value) {
-        let sensitivity: Float = 0.0005
+        let sensitivity: Float = 0.0003 // Reduced for more precise control with larger objects
         let deltaX = Float(value.translation.width) * sensitivity
-        let deltaY = -Float(value.translation.height) * sensitivity * 0.8 // Slightly slower Y movement
+        let deltaY = -Float(value.translation.height) * sensitivity * 0.7 // More controlled Y movement
         
         var newPosition = gameState.ringPosition
         newPosition.x += deltaX
@@ -271,7 +271,7 @@ struct ARViewContainer: UIViewRepresentable {
         
         // Create anchor that appears immediately in front of camera (no plane detection needed)
         let anchor = AnchorEntity(.camera)
-        anchor.position = [0, -0.1, -0.5] // 50cm in front, 10cm below camera
+        anchor.position = [0, -0.08, -0.35] // 35cm in front, 8cm below camera - closer for "examining closely" feel
         
         // Remove test cube - we don't need it anymore
         
@@ -317,13 +317,15 @@ func createSimpleWire() -> Entity {
     
     // Create curved horizontal wire path like classic buzz wire game
     let wirePoints: [SIMD3<Float>] = [
-        [-0.2, 0, 0],      // Start point (left)
-        [-0.1, 0.04, 0],   // Up curve
+        [-0.2, 0, 0],        // Start point (left)
+        [-0.15, 0.02, 0],    // Slight rise
+        [-0.1, 0.04, 0],     // Up curve
         [-0.05, 0.02, 0.03], // Twist forward
-        [0, 0.06, 0],      // High point
+        [0, 0.06, 0],        // High point
         [0.05, 0.03, -0.02], // Twist back
-        [0.1, 0.01, 0.04], // Low twist
-        [0.2, 0, 0]        // End point (right)
+        [0.1, 0.01, 0.04],   // Low twist
+        [0.15, 0.02, 0],     // Final rise
+        [0.2, 0, 0]          // End point (right)
     ]
     
     // Create wire segments connecting the points
@@ -335,7 +337,7 @@ func createSimpleWire() -> Entity {
         
         let wireSegment = Entity()
         wireSegment.components.set(ModelComponent(
-            mesh: MeshResource.generateCylinder(height: distance, radius: 0.002),
+            mesh: MeshResource.generateCylinder(height: distance, radius: 0.006),
             materials: [SimpleMaterial(color: .init(red: 0.8, green: 0.6, blue: 0.2, alpha: 1), roughness: 0.3, isMetallic: true)]
         ))
         
@@ -354,7 +356,7 @@ func createSimpleWire() -> Entity {
         
         wireSegment.transform.matrix = rotationMatrix
         wireSegment.position = center
-        wireSegment.components.set(CollisionComponent(shapes: [.generateCapsule(height: distance, radius: 0.008)]))
+        wireSegment.components.set(CollisionComponent(shapes: [.generateCapsule(height: distance, radius: 0.012)]))
         
         wireContainer.addChild(wireSegment)
     }
@@ -362,18 +364,18 @@ func createSimpleWire() -> Entity {
     // Add support posts at start and end
     let startPost = Entity()
     startPost.components.set(ModelComponent(
-        mesh: MeshResource.generateCylinder(height: 0.08, radius: 0.004),
+        mesh: MeshResource.generateCylinder(height: 0.12, radius: 0.008),
         materials: [SimpleMaterial(color: .init(red: 0.3, green: 0.3, blue: 0.3, alpha: 1), isMetallic: false)]
     ))
-    startPost.position = [-0.2, -0.04, 0]
+    startPost.position = [-0.2, -0.06, 0]
     wireContainer.addChild(startPost)
     
     let endPost = Entity()
     endPost.components.set(ModelComponent(
-        mesh: MeshResource.generateCylinder(height: 0.08, radius: 0.004),
+        mesh: MeshResource.generateCylinder(height: 0.12, radius: 0.008),
         materials: [SimpleMaterial(color: .init(red: 0.3, green: 0.3, blue: 0.3, alpha: 1), isMetallic: false)]
     ))
-    endPost.position = [0.2, -0.04, 0]
+    endPost.position = [0.2, -0.06, 0]
     wireContainer.addChild(endPost)
     
     return wireContainer
@@ -383,9 +385,9 @@ func createSimpleRing() -> Entity {
     let ringContainer = Entity()
     
     // Create ring using multiple small spheres to form a circle (like a torus)
-    let segments = 16
-    let radius: Float = 0.015
-    let tubeRadius: Float = 0.003
+    let segments = 20
+    let radius: Float = 0.035
+    let tubeRadius: Float = 0.008
     
     for i in 0..<segments {
         let angle = Float(i) * 2.0 * Float.pi / Float(segments)
@@ -403,7 +405,7 @@ func createSimpleRing() -> Entity {
     }
     
     // Add collision for the whole ring
-    ringContainer.components.set(CollisionComponent(shapes: [.generateSphere(radius: 0.018)]))
+    ringContainer.components.set(CollisionComponent(shapes: [.generateSphere(radius: 0.045)]))
     
     return ringContainer
 }
