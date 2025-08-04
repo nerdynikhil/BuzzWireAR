@@ -11,7 +11,7 @@ class BuzzWireGameState {
     var buzzCount = 0
     var isGameWon = false
     var isGameLost = false
-    var ringPosition: SIMD3<Float> = [-0.15, 0.01, 0]
+    var ringPosition: SIMD3<Float> = [-0.2, 0, 0]
     var ringEntity: Entity?
     var wireEntities: [Entity] = []
     private var gameTimer: Timer?
@@ -24,7 +24,7 @@ class BuzzWireGameState {
         buzzCount = 0
         isGameWon = false
         isGameLost = false
-        ringPosition = [-0.15, 0.01, 0]
+        ringPosition = [-0.2, 0, 0]
         
         gameTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             self.gameTime += 0.1
@@ -66,7 +66,7 @@ class BuzzWireGameState {
         ringPosition = position
         ringEntity?.position = position
         
-        if position.x >= 0.14 && gameStarted {
+        if position.x >= 0.18 && gameStarted {
             winGame()
         }
     }
@@ -240,16 +240,17 @@ struct BuzzWireGameView: View {
     }
     
     private func handleDrag(value: DragGesture.Value) {
-        let sensitivity: Float = 0.0003
+        let sensitivity: Float = 0.0005
         let deltaX = Float(value.translation.width) * sensitivity
-        let deltaY = -Float(value.translation.height) * sensitivity
+        let deltaY = -Float(value.translation.height) * sensitivity * 0.8 // Slightly slower Y movement
         
         var newPosition = gameState.ringPosition
         newPosition.x += deltaX
         newPosition.y += deltaY
         
-        newPosition.x = max(-0.16, min(0.16, newPosition.x))
-        newPosition.y = max(0.01, min(0.05, newPosition.y))
+        newPosition.x = max(-0.22, min(0.22, newPosition.x))
+        newPosition.y = max(-0.02, min(0.08, newPosition.y))
+        newPosition.z = max(-0.05, min(0.05, newPosition.z))
         
         gameState.moveRing(to: newPosition)
     }
@@ -272,16 +273,7 @@ struct ARViewContainer: UIViewRepresentable {
         let anchor = AnchorEntity(.camera)
         anchor.position = [0, -0.1, -0.5] // 50cm in front, 10cm below camera
         
-        // Add red test cube to verify AR works
-        let testCube = Entity()
-        testCube.components.set(ModelComponent(
-            mesh: MeshResource.generateBox(size: 0.05),
-            materials: [SimpleMaterial(color: .red, isMetallic: false)]
-        ))
-        testCube.position = [0, 0, 0]
-        anchor.addChild(testCube)
-        
-        print("✅ Added test cube")
+        // Remove test cube - we don't need it anymore
         
         // Add wire and ring
         let wirePath = createSimpleWire()
@@ -323,43 +315,97 @@ struct ARViewContainer: UIViewRepresentable {
 func createSimpleWire() -> Entity {
     let wireContainer = Entity()
     
-    // Create twisted wire path that looks more interesting
+    // Create curved horizontal wire path like classic buzz wire game
     let wirePoints: [SIMD3<Float>] = [
-        [-0.15, 0.01, 0],
-        [-0.08, 0.04, 0.02],
-        [0, 0.02, -0.01],
-        [0.08, 0.05, 0.01],
-        [0.15, 0.01, 0]
+        [-0.2, 0, 0],      // Start point (left)
+        [-0.1, 0.04, 0],   // Up curve
+        [-0.05, 0.02, 0.03], // Twist forward
+        [0, 0.06, 0],      // High point
+        [0.05, 0.03, -0.02], // Twist back
+        [0.1, 0.01, 0.04], // Low twist
+        [0.2, 0, 0]        // End point (right)
     ]
     
-    for i in 0..<wirePoints.count {
+    // Create wire segments connecting the points
+    for i in 0..<(wirePoints.count - 1) {
+        let startPoint = wirePoints[i]
+        let endPoint = wirePoints[i + 1]
+        let distance = length(endPoint - startPoint)
+        let center = (startPoint + endPoint) / 2
+        
         let wireSegment = Entity()
         wireSegment.components.set(ModelComponent(
-            mesh: MeshResource.generateBox(size: [0.02, 0.02, 0.06]),
-            materials: [SimpleMaterial(color: .orange, isMetallic: false)]
+            mesh: MeshResource.generateCylinder(height: distance, radius: 0.002),
+            materials: [SimpleMaterial(color: .init(red: 0.8, green: 0.6, blue: 0.2, alpha: 1), roughness: 0.3, isMetallic: true)]
         ))
-        wireSegment.position = wirePoints[i]
         
-        // Add collision back now that audio is safe
-        wireSegment.components.set(CollisionComponent(shapes: [.generateBox(size: [0.02, 0.02, 0.06])]))
+        // Orient the cylinder along the wire segment
+        let direction = normalize(endPoint - startPoint)
+        let up = SIMD3<Float>(0, 1, 0)
+        let right = normalize(cross(up, direction))
+        let newUp = cross(direction, right)
+        
+        let rotationMatrix = float4x4(
+            SIMD4<Float>(right.x, right.y, right.z, 0),
+            SIMD4<Float>(newUp.x, newUp.y, newUp.z, 0),
+            SIMD4<Float>(direction.x, direction.y, direction.z, 0),
+            SIMD4<Float>(0, 0, 0, 1)
+        )
+        
+        wireSegment.transform.matrix = rotationMatrix
+        wireSegment.position = center
+        wireSegment.components.set(CollisionComponent(shapes: [.generateCapsule(height: distance, radius: 0.008)]))
         
         wireContainer.addChild(wireSegment)
     }
+    
+    // Add support posts at start and end
+    let startPost = Entity()
+    startPost.components.set(ModelComponent(
+        mesh: MeshResource.generateCylinder(height: 0.08, radius: 0.004),
+        materials: [SimpleMaterial(color: .init(red: 0.3, green: 0.3, blue: 0.3, alpha: 1), isMetallic: false)]
+    ))
+    startPost.position = [-0.2, -0.04, 0]
+    wireContainer.addChild(startPost)
+    
+    let endPost = Entity()
+    endPost.components.set(ModelComponent(
+        mesh: MeshResource.generateCylinder(height: 0.08, radius: 0.004),
+        materials: [SimpleMaterial(color: .init(red: 0.3, green: 0.3, blue: 0.3, alpha: 1), isMetallic: false)]
+    ))
+    endPost.position = [0.2, -0.04, 0]
+    wireContainer.addChild(endPost)
     
     return wireContainer
 }
 
 func createSimpleRing() -> Entity {
-    let ring = Entity()
-    ring.components.set(ModelComponent(
-        mesh: MeshResource.generateBox(size: [0.03, 0.03, 0.01]),  
-        materials: [SimpleMaterial(color: .blue, isMetallic: false)]
-    ))
+    let ringContainer = Entity()
     
-    // Add collision back
-    ring.components.set(CollisionComponent(shapes: [.generateBox(size: [0.03, 0.03, 0.01])]))
+    // Create ring using multiple small spheres to form a circle (like a torus)
+    let segments = 16
+    let radius: Float = 0.015
+    let tubeRadius: Float = 0.003
     
-    return ring
+    for i in 0..<segments {
+        let angle = Float(i) * 2.0 * Float.pi / Float(segments)
+        let x = radius * cos(angle)
+        let z = radius * sin(angle)
+        
+        let segment = Entity()
+        segment.components.set(ModelComponent(
+            mesh: MeshResource.generateSphere(radius: tubeRadius),
+            materials: [SimpleMaterial(color: .init(red: 0.1, green: 0.5, blue: 0.9, alpha: 1), roughness: 0.2, isMetallic: true)]
+        ))
+        segment.position = [x, 0, z]
+        
+        ringContainer.addChild(segment)
+    }
+    
+    // Add collision for the whole ring
+    ringContainer.components.set(CollisionComponent(shapes: [.generateSphere(radius: 0.018)]))
+    
+    return ringContainer
 }
 
 #Preview {
