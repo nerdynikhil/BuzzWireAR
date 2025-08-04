@@ -271,7 +271,7 @@ struct ARViewContainer: UIViewRepresentable {
         
         // Create anchor that appears immediately in front of camera (no plane detection needed)
         let anchor = AnchorEntity(.camera)
-        anchor.position = [0, -0.08, -0.35] // 35cm in front, 8cm below camera - closer for "examining closely" feel
+        anchor.position = [0, -0.1, -0.6] // 60cm in front, 10cm below camera - further back to see full wire
         
         // Remove test cube - we don't need it anymore
         
@@ -318,15 +318,15 @@ func createSimpleWire() -> Entity {
         let wireModel = try Entity.load(named: "3D Model - Buzz+Wire/model.dae")
         print("✅ Successfully loaded buzz wire 3D model")
         
-        // Scale the model appropriately for AR viewing
-        wireModel.scale = [0.001, 0.001, 0.001] // Scale down from SketchUp units
+        // Scale the model appropriately for AR viewing - much smaller to fit entire wire on screen
+        wireModel.scale = [0.0005, 0.0005, 0.0005] // Even smaller scale to see full wire
         wireModel.position = [0, 0, 0]
         
         // Add collision detection to the entire model
         // We'll add a simplified collision shape since the 3D model is complex
         let simplifiedCollision = Entity()
         simplifiedCollision.components.set(CollisionComponent(shapes: [
-            .generateBox(size: [0.4, 0.1, 0.1]) // Simple box collision for the wire area
+            .generateBox(size: [0.2, 0.05, 0.05]) // Smaller collision to match scaled model
         ]))
         wireModel.addChild(simplifiedCollision)
         
