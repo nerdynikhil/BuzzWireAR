@@ -343,7 +343,7 @@ func createWirePath() -> Entity {
         wireSegment.transform.matrix = rotationMatrix
         wireSegment.position = center
         
-        wireSegment.components.set(CollisionComponent(shapes: [ShapeResource.generateCylinder(height: distance, radius: 0.006)]))
+        wireSegment.components.set(CollisionComponent(shapes: [.generateCapsule(height: distance, radius: 0.006)]))
         
         wireContainer.addChild(wireSegment)
     }
@@ -384,7 +384,7 @@ func createRing() -> Entity {
         ringContainer.addChild(segment)
     }
     
-    ringContainer.components.set(CollisionComponent(shapes: [ShapeResource.generateSphere(radius: 0.012)]))
+    ringContainer.components.set(CollisionComponent(shapes: [.generateSphere(radius: 0.012)]))
     
     return ringContainer
 }
