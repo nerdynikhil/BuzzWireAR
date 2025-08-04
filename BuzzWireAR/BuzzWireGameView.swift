@@ -335,13 +335,13 @@ func createSimpleWire() -> Entity {
     for i in 0..<wirePoints.count {
         let wireSegment = Entity()
         wireSegment.components.set(ModelComponent(
-            mesh: MeshResource.generateBox(size: [0.003, 0.003, 0.04]),
-            materials: [SimpleMaterial(color: .init(red: 0.8, green: 0.6, blue: 0.2, alpha: 1), roughness: 0.3, isMetallic: true)]
+            mesh: MeshResource.generateBox(size: [0.02, 0.02, 0.06]),
+            materials: [SimpleMaterial(color: .orange, isMetallic: false)]
         ))
         wireSegment.position = wirePoints[i]
         
         // Add collision back now that audio is safe
-        wireSegment.components.set(CollisionComponent(shapes: [.generateBox(size: [0.01, 0.01, 0.04])]))
+        wireSegment.components.set(CollisionComponent(shapes: [.generateBox(size: [0.02, 0.02, 0.06])]))
         
         wireContainer.addChild(wireSegment)
     }
@@ -352,12 +352,12 @@ func createSimpleWire() -> Entity {
 func createSimpleRing() -> Entity {
     let ring = Entity()
     ring.components.set(ModelComponent(
-        mesh: MeshResource.generateBox(size: [0.018, 0.018, 0.003]),  
-        materials: [SimpleMaterial(color: .init(red: 0.1, green: 0.5, blue: 0.9, alpha: 1), roughness: 0.2, isMetallic: true)]
+        mesh: MeshResource.generateBox(size: [0.03, 0.03, 0.01]),  
+        materials: [SimpleMaterial(color: .blue, isMetallic: false)]
     ))
     
     // Add collision back
-    ring.components.set(CollisionComponent(shapes: [.generateBox(size: [0.018, 0.018, 0.003])]))
+    ring.components.set(CollisionComponent(shapes: [.generateBox(size: [0.03, 0.03, 0.01])]))
     
     return ring
 }
