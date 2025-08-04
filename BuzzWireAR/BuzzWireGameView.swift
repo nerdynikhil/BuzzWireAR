@@ -265,7 +265,7 @@ struct BuzzWireGameView: View {
     }
 }
 
-func setupBuzzWireGame(content: RealityViewContent, gameState: BuzzWireGameState, soundManager: SoundManager, onPlaneDetected: @escaping () -> Void) {
+func setupBuzzWireGame(content: inout RealityViewContent, gameState: BuzzWireGameState, soundManager: SoundManager, onPlaneDetected: @escaping () -> Void) {
     let anchor = AnchorEntity(.plane(.horizontal, classification: .any, minimumBounds: SIMD2<Float>(0.3, 0.3)))
     
     onPlaneDetected()
@@ -294,7 +294,7 @@ func setupGameSounds(gameState: BuzzWireGameState, soundManager: SoundManager) {
     }
 }
 
-func updateGame(content: RealityViewContent, gameState: BuzzWireGameState) {
+func updateGame(content: inout RealityViewContent, gameState: BuzzWireGameState) {
     gameState.ringEntity?.position = gameState.ringPosition
 }
 
